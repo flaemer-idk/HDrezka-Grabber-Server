@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HDrezka Grabber — сервер загрузок</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>HDrezka Grabber <span class="muted">— сервер загрузок</span></h1>
+      <div id="server-info" class="server-info">Загрузка…</div>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Добавить по прямой ссылке</h2>
+        <form id="add-form" class="grid-form">
+          <label>
+            Ссылка (mp4 / m3u8 / vtt)
+            <input name="url" type="url" placeholder="https://…mp4" required />
+          </label>
+          <label>
+            Имя файла (необязательно)
+            <input name="filename" type="text" placeholder="Будет собрано из настроек" />
+          </label>
+          <label>
+            Referer (необязательно)
+            <input name="referer" type="text" placeholder="https://hdrezka.ag/…" />
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="primary">Добавить в очередь</button>
+            <span id="add-status" class="hint"></span>
+          </div>
+        </form>
+        <p class="hint">
+          Обычно сюда ничего вставлять не нужно: расширение само находит ссылку, озвучку,
+          качество и год на странице фильма и отправляет задачу на этот сервер. Поле нужно,
+          только если у вас уже есть прямая ссылка на файл.
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="row">
+          <h2>Очередь</h2>
+          <span id="queue-status" class="hint"></span>
+          <div class="spacer"></div>
+          <button id="stop-all" type="button">Остановить все</button>
+          <button id="resume-all" type="button">Возобновить все</button>
+          <button id="retry-failed" type="button">Повторить сбойные</button>
+          <button id="clear-finished" type="button">Очистить завершённые</button>
+        </div>
+        <div id="tasks" class="tasks"></div>
+      </section>
+
+      <section class="card">
+        <h2>Настройки</h2>
+        <form id="settings-form" class="grid-form">
+          <label>
+            Папка загрузок на сервере
+            <input name="download_dir" type="text" />
+          </label>
+          <label>
+            Одновременных загрузок
+            <input name="max_concurrent" type="number" min="1" max="16" />
+          </label>
+          <label>
+            Попыток на задачу
+            <input name="max_attempts" type="number" min="1" max="50" />
+          </label>
+          <label>
+            Пауза между попытками, сек
+            <input name="retry_delay_s" type="number" min="1" max="3600" />
+          </label>
+          <label class="wide checkbox-label">
+            <input type="checkbox" name="overwrite_existing" />
+            Перезаписывать готовые файлы при повторной загрузке (без « (1)»)
+          </label>
+          <label class="wide">
+            Папка медиатеки (пусто — качать в папку загрузок)
+            <input name="library_dir" type="text" placeholder="/mnt/media" />
+          </label>
+          <label class="wide">
+            Категории → папки медиатеки (по строке: раздел = папка)
+            <textarea name="library_categories" rows="5" spellcheck="false"></textarea>
+          </label>
+          <label class="wide">
+            Шаблон имени: фильмы
+            <input name="filename_template_film" type="text" />
+          </label>
+          <label class="wide">
+            Шаблон имени: сериалы
+            <input name="filename_template_series" type="text" />
+          </label>
+          <label class="wide">
+            Шаблон имени: субтитры
+            <input name="filename_template_subtitle" type="text" />
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="primary">Сохранить</button>
+            <span id="settings-status" class="hint"></span>
+          </div>
+        </form>
+        <p class="hint">
+          Плейсхолдеры: %title%, %orig_title%, %quality%, %voiceover%, %season%, %season_id%,
+          %episode%, %episode_id%, %sxxexx%, %movie_id%, %subtitle_lang%. Символ «/» создаёт подпапку.
+        </p>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

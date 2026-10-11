@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>HDrezka → Сервер</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="title">HDrezka <span class="arrow">→</span> Сервер</div>
+        <button id="copy-debug" class="icon-btn" title="Скопировать диагностику (если что-то не работает — пришлите её)">🐞</button>
+        <button id="toggle-settings" class="icon-btn" title="Настройки сервера">⚙</button>
+      </header>
+
+      <section id="settings" class="settings hidden">
+        <label class="field">
+          Адрес сервера
+          <input id="server-url" type="text" placeholder="http://192.168.1.100:8080" />
+        </label>
+        <label class="field">
+          Токен (если включён на сервере)
+          <input id="server-token" type="text" placeholder="необязательно" />
+        </label>
+        <div class="row">
+          <button id="save-settings" class="primary">Сохранить</button>
+          <span id="settings-status" class="hint"></span>
+        </div>
+      </section>
+
+      <div id="page-info" class="page-info">Определяем страницу…</div>
+      <div id="already" class="warn-line hidden"></div>
+
+      <section id="controls" class="controls hidden">
+        <label class="field">Озвучка <select id="voiceover"></select></label>
+        <label class="field">Качество <select id="quality"></select></label>
+
+        <label class="check"><input type="checkbox" id="subs-enabled" /> Скачивать субтитры</label>
+        <span id="subs-note" class="hint hidden"></span>
+        <label class="field hidden" id="subs-lang-wrap">
+          Язык субтитров <select id="subs-lang"></select>
+        </label>
+
+        <div id="range-block" class="hidden">
+          <label class="field">
+            Что качать
+            <select id="range-mode">
+              <option value="current">Текущую серию</option>
+              <option value="season">Все серии текущего сезона</option>
+              <option value="all">Весь сериал</option>
+              <option value="custom">Диапазон…</option>
+            </select>
+          </label>
+          <div id="range-custom" class="hidden range-grid">
+            <label class="field">Сезон с <select id="season-from"></select></label>
+            <label class="field">Серия с <select id="episode-from"></select></label>
+            <label class="field">Сезон по <select id="season-to"></select></label>
+            <label class="field">Серия по <select id="episode-to"></select></label>
+          </div>
+        </div>
+
+        <button id="download" class="primary big">Скачать на сервер</button>
+        <div id="action-status" class="hint"></div>
+      </section>
+
+      <section id="queue" class="queue hidden">
+        <div class="queue-head">
+          <span>На сервере</span>
+          <span id="queue-stats" class="muted"></span>
+          <button id="stop-all" type="button" class="mini" title="Отменить все активные загрузки">Остановить</button>
+          <button id="resume-all" type="button" class="mini" title="Возобновить всё, что на паузе">Возобновить</button>
+        </div>
+        <div id="queue-list" class="queue-list"></div>
+      </section>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

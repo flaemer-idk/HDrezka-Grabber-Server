@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "HDrezka Grabber → Сервер",
+  "version": "0.6.0",
+  "description": "Отправляет ссылку на видео со страницы hdrezka на ваш сервер загрузок: файл качается сразу на сервер.",
+  "minimum_chrome_version": "111",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "hdzg-server-client@local",
+      "strict_min_version": "128.0"
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "HDrezka Grabber → Сервер"
+  }
+}

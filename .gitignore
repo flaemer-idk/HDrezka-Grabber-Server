@@ -1,9 +1,22 @@
-# builds
-dist/build/*
-
-# keys
-*.pem
-
+# ── Рантайм сервера (появляется при запуске, в репозиторий не нужно) ──
+server/data/
+server/downloads/
+server/node_modules/
+data/
+downloads/
 node_modules/
 
-.idea/*
+# База данных, недокачанные файлы, логи
+*.db
+*.db-shm
+*.db-wal
+*.part
+*.log
+
+# Nix
+result
+result-*
+
+# Мусор редакторов/ОС
+.DS_Store
+*.swp

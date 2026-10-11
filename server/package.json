@@ -1,0 +1,14 @@
+{
+  "name": "hdrezka-grabber-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Локальный сервер загрузок для HDrezka-Grabber: качает видео/субтитры на сервер, отдаёт веб-морду с очередью и прогрессом",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  }
+}

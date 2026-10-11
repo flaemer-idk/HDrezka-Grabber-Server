@@ -1,0 +1,46 @@
+# systemd-юнит для обычного Linux (не NixOS).
+# Положите файл в /etc/systemd/system/ и выполните:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now hdrezka-grabber-server
+#
+# Пути и пользователя поправьте под себя. Для NixOS используйте модуль
+# services.hdrezka-grabber-server (см. nix/module.nix) — там всё то же самое,
+# но декларативно.
+[Unit]
+Description=HDrezka Grabber Server (сервер загрузок hdrezka с веб-мордой)
+Documentation=https://github.com/kristal374/HDrezka-Grabber
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hdrezka-grabber
+Group=hdrezka-grabber
+WorkingDirectory=/opt/HDrezka-Grabber/server
+
+# Порт: main изменяется аргументом --port
+ExecStart=/usr/bin/node /opt/HDrezka-Grabber/server/src/index.js --port 8080
+
+Environment=DB_FILE=/var/lib/hdrezka-grabber/grabber.db
+Environment=DOWNLOAD_DIR=/var/lib/hdrezka-grabber/downloads
+# Медиатека (необязательно; дальше настраивается в веб-морде):
+#Environment=LIBRARY_DIR=/mnt/media/Jellyfin
+# Токен доступа к API (необязательно):
+#EnvironmentFile=/etc/hdrezka-grabber.env
+
+Restart=on-failure
+RestartSec=5
+
+# Ограничения доступа: серверу нужны только сеть и свои каталоги
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/hdrezka-grabber
+
+[Install]
+WantedBy=multi-user.target
