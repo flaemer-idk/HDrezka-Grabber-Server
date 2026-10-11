@@ -103,15 +103,52 @@ nix run .#hdrezka-grabber-server -- --port 8080   # запустить без у
 nix build .#hdrezka-grabber-server                # собрать пакет
 ```
 
-Подключение модуля во флейк-конфиге:
+Подключение модуля во флейк-конфиге — два шага: инпут и модуль в `modules`
+(или `imports`, если конфиг разбит на файлы):
 
 ```nix
+# flake.nix
 {
-  inputs.hdrezka-grabber.url = "github:flaemer-idk/HDrezka-Grabber-Server";
-  # ...
-  imports = [ inputs.hdrezka-grabber.nixosModules.default ];
+  inputs.hdrezka-grabber = {
+    url = "github:flaemer-idk/HDrezka-Grabber-Server";
+    inputs.nixpkgs.follows = "nixpkgs";   # собирать на вашем nixpkgs
+  };
+
+  outputs = { self, nixpkgs, hdrezka-grabber, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      modules = [
+        ./configuration.nix
+        hdrezka-grabber.nixosModules.default   # services.hdrezka-grabber-server
+      ];
+    };
+  };
 }
 ```
+
+```nix
+# configuration.nix
+{ pkgs, ... }:
+{
+  services.hdrezka-grabber-server = {
+    enable = true;                                # сервис стартует при загрузке
+    port = 8080;                                  # веб-морда и API
+    openFirewall = true;                          # чтобы расширение видело сервер
+    downloadDir = "/idkselfhost/HDrezka/downloads";
+    extraPackages = [ pkgs.ffmpeg ];              # для .m3u8 (HLS)
+  };
+}
+```
+
+После первого подключения и каждого нового коммита в этом репозитории:
+
+```bash
+nix flake update hdrezka-grabber        # перечитать репозиторий
+sudo nixos-rebuild switch --flake .#myhost
+```
+
+Для локальной разработки вместо `github:` можно указать путь
+(`url = "path:/home/user/HDrezka-Grabber-Server";`) — тогда правки видны сразу
+после `nix flake update hdrezka-grabber`.
 
 Флейкам нужны файлы, добавленные в Git (`git add server nix flake.nix`), иначе
 `nix build` скажет «is not tracked by Git».
