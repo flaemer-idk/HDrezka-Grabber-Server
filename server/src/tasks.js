@@ -44,6 +44,11 @@ export function prepareTask(raw) {
     file_type: fileType,
     subtitle_lang:
       raw.subtitle_lang || raw.subtitleLang ? String(raw.subtitle_lang || raw.subtitleLang) : null,
+    // Код языка от сайта (subtitle_lns): точнее, чем словарь сервера.
+    subtitle_lang_code:
+      raw.subtitle_lang_code || raw.subtitleLangCode
+        ? String(raw.subtitle_lang_code || raw.subtitleLangCode)
+        : null,
     total_bytes: Number(raw.total_bytes || raw.totalBytes) || 0,
   };
 

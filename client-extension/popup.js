@@ -1003,6 +1003,9 @@ function buildTasksForEpisode(data, episode) {
         episode_title: episodeData?.title ?? null,
         file_type: 'subtitle',
         subtitle_lang: subtitle.lang,
+        // Код языка от сайта (subtitle_lns) — сервер подставит его в имя файла,
+        // если он есть; иначе сам переведёт название («Русский» → rus).
+        subtitle_lang_code: subtitle.code,
       });
     } else {
       const where = episode ? `серия ${episode.episode}: ` : '';

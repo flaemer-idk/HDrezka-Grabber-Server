@@ -22,11 +22,12 @@ const DEFAULT_SETTINGS = {
     'documentary = Документальные',
   ].join('\n'),
   // Год — только на папке; серии — в подпапке «Season N»; имя субтитра
-  // совпадает с именем видео, чтобы его подхватывал Jellyfin.
+  // совпадает с именем видео, а язык — кодом в суффиксе (American Psycho.rus.vtt),
+  // как это ждёт Jellyfin.
   filename_template_film: '%orig_title%%year_part%/%orig_title%',
   filename_template_series: '%orig_title%%year_part%/%season_folder%/%orig_title%%sxxexx%',
   filename_template_subtitle:
-    '%orig_title%%year_part%/%season_folder%/%orig_title%%sxxexx% [%subtitle_lang%]',
+    '%orig_title%%year_part%/%season_folder%/%orig_title%%sxxexx%.%subtitle_lang%',
 };
 
 /** Старые значения по умолчанию — заменяются на новые автоматически. */
@@ -59,6 +60,11 @@ const LEGACY_DEFAULTS = [
   [
     'filename_template_subtitle',
     '%orig_title%%year_part%/Season %season_id%/%orig_title%%sxxexx% [%subtitle_lang%]',
+  ],
+  // версия с языком в квадратных скобках («[Русский]» вместо кода «.rus»)
+  [
+    'filename_template_subtitle',
+    '%orig_title%%year_part%/%season_folder%/%orig_title%%sxxexx% [%subtitle_lang%]',
   ],
 ];
 
@@ -93,6 +99,7 @@ function initDb(db) {
       episode_title   TEXT,
       file_type       TEXT    NOT NULL DEFAULT 'video',
       subtitle_lang   TEXT,
+      subtitle_lang_code TEXT,
       total_bytes     INTEGER NOT NULL DEFAULT 0,
       received_bytes  INTEGER NOT NULL DEFAULT 0,
       attempts        INTEGER NOT NULL DEFAULT 0,
@@ -111,10 +118,13 @@ function initDb(db) {
     );
   `);
 
-  // Миграция существующих баз: добавляем колонку year, если её нет.
+  // Миграция существующих баз: добавляем колонки, которых в них ещё нет.
   const columns = db.prepare('PRAGMA table_info(tasks)').all().map((row) => row.name);
-  if (!columns.includes('year')) {
-    db.exec('ALTER TABLE tasks ADD COLUMN year TEXT');
+  for (const [name, type] of [
+    ['year', 'TEXT'],
+    ['subtitle_lang_code', 'TEXT'],
+  ]) {
+    if (!columns.includes(name)) db.exec(`ALTER TABLE tasks ADD COLUMN ${name} ${type}`);
   }
 
   const insert = db.prepare('INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)');
@@ -165,6 +175,7 @@ const TASK_COLUMNS = [
   'episode_title',
   'file_type',
   'subtitle_lang',
+  'subtitle_lang_code',
   'total_bytes',
   'received_bytes',
   'attempts',
@@ -219,6 +230,7 @@ export function createTask(input) {
     episode_title: input.episode_title,
     file_type: input.file_type === 'subtitle' ? 'subtitle' : 'video',
     subtitle_lang: input.subtitle_lang,
+    subtitle_lang_code: input.subtitle_lang_code,
     total_bytes: Number(input.total_bytes) || 0,
     received_bytes: 0,
     attempts: 0,
@@ -371,6 +383,7 @@ export function serializeTask(row) {
     episodeTitle: row.episode_title,
     fileType: row.file_type,
     subtitleLang: row.subtitle_lang,
+    subtitleLangCode: row.subtitle_lang_code,
     totalBytes: row.total_bytes,
     receivedBytes: row.received_bytes,
     attempts: row.attempts,
