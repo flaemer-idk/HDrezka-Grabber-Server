@@ -1,4 +1,6 @@
-# NixOS-модуль: services.hdrezka-grabber-server
+# NixOS-модуль: services.hdrezka-grabber-server (вариант для флейков).
+# Если флейки не используются — возьмите `nix/hdrezka-grabber.nix`: это
+# самодостаточный модуль, который сам скачивает исходники с GitHub.
 #
 # Пример подключения (flake):
 #   imports = [ inputs.hdrezka-grabber.nixosModules.default ];
