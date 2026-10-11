@@ -56,7 +56,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   meta = {
     description = "Локальный сервер загрузок hdrezka с веб-мордой (качает на сервер, а не в браузер)";
-    homepage = "https://github.com/kristal374/HDrezka-Grabber";
+    homepage = "https://github.com/flaemer-idk/HDrezka-Grabber-Server";
     license = lib.licenses.gpl3Only;
     mainProgram = "hdrezka-grabber-server";
     platforms = lib.platforms.all;

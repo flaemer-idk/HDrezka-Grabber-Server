@@ -145,7 +145,7 @@ in
 
     systemd.services.hdrezka-grabber-server = {
       description = "HDrezka Grabber Server";
-      documentation = [ "https://github.com/kristal374/HDrezka-Grabber" ];
+      documentation = [ "https://github.com/flaemer-idk/HDrezka-Grabber-Server" ];
       wantedBy = [ "multi-user.target" ];
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];

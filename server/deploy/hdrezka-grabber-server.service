@@ -4,11 +4,11 @@
 #   sudo systemctl enable --now hdrezka-grabber-server
 #
 # Пути и пользователя поправьте под себя. Для NixOS используйте модуль
-# services.hdrezka-grabber-server (см. nix/module.nix) — там всё то же самое,
-# но декларативно.
+# services.hdrezka-grabber-server (см. nix/module.nix, а для варианта без
+# флейков — nix/hdrezka-grabber.nix) — там всё то же самое, но декларативно.
 [Unit]
 Description=HDrezka Grabber Server (сервер загрузок hdrezka с веб-мордой)
-Documentation=https://github.com/kristal374/HDrezka-Grabber
+Documentation=https://github.com/flaemer-idk/HDrezka-Grabber-Server
 After=network-online.target
 Wants=network-online.target
 

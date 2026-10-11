@@ -32,12 +32,45 @@ node src/index.js --version
 
 ## Установка на NixOS
 
-В репозитории есть флейк: пакет + модуль (сервис systemd).
+Есть два варианта: самодостаточный модуль без флейков (`nix/hdrezka-grabber.nix`)
+и флейк (пакет + модуль, `nix/module.nix`).
+
+### Без флейков
+
+`nix/hdrezka-grabber.nix` сам скачивает исходники с GitHub (`fetchFromGitHub`,
+тег `v0.1.0`) и сам собирает пакет — достаточно скопировать файл в свой конфиг:
+
+```bash
+cp nix/hdrezka-grabber.nix ~/nixos/Custom/HDrezka/module.nix
+```
+
+```nix
+# в конфиге
+{
+  imports = [ ./Custom/HDrezka/module.nix ];
+
+  services.hdrezka-grabber-server = {
+    enable = true;
+    port = 8080;
+    openFirewall = true;                  # чтобы расширение с ноутбука видело сервер
+    dataDir = "/idkselfhost/HDrezka";                # база: история и настройки
+    downloadDir = "/idkselfhost/HDrezka/downloads";  # куда качать (если не медиатека)
+    libraryDir = "/idkselfhost/Media";               # начальное значение (потом — веб-морда)
+    group = "media";                      # если медиатека общая с Jellyfin
+    extraPackages = [ pkgs.ffmpeg ];      # для .m3u8 (HLS)
+  };
+}
+```
+
+Обновление версии: поменять `rev` на новый тег, поставить `hash = lib.fakeHash`
+и запустить `nixos-rebuild switch` — Nix напишет настоящий хеш в ошибке.
+
+### Флейком
 
 ```nix
 # flake.nix вашей конфигурации
 {
-  inputs.hdrezka-grabber.url = "github:kristal374/HDrezka-Grabber";
+  inputs.hdrezka-grabber.url = "github:flaemer-idk/HDrezka-Grabber-Server";
 
   outputs = { nixpkgs, hdrezka-grabber, ... }: {
     nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
@@ -77,7 +110,8 @@ nix run .#hdrezka-grabber-server       # запустить сразу (данн
 ```
 
 > Nix-флейки видят только файлы, отслеживаемые git, поэтому перед первой сборкой
-> добавьте их: `git add flake.nix nix server`. Без флейка пакет тоже собирается:
+> добавьте их: `git add flake.nix nix server` (в этом репозитории они уже
+> закоммичены). Без флейка пакет тоже собирается:
 > `nix-build -E 'with import <nixpkgs> {}; callPackage ./nix/package.nix {}'`
 
 Что внутри пакета: только `node` и обёртка-лаунчер (зависимостей нет — используется
