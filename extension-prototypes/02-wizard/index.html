@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Прототип №2 «Мастер» — расширение в дизайне сайта</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="stage">
+  <div class="stage-head">
+    <div class="stage-title">Прототип №2 — «Мастер»</div>
+    <div class="stage-sub">
+      Загрузка и очередь — два отдельных экрана. Отправка идёт мастером: что качать (чипы серий) →
+      параметры (карточки-выборы) → проверка. Другая компоновка и другой сценарий. Данные ненастоящие.
+    </div>
+    <div class="demo-bar" id="demo-bar">
+      <span class="demo-label">Демо:</span>
+      <div class="seg">
+        <button type="button" class="seg-btn active" data-demo="normal">Обычная страница</button>
+        <button type="button" class="seg-btn" data-demo="nopage">Не та страница</button>
+        <button type="button" class="seg-btn" data-demo="offline">Сервер офлайн</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ПОПАП ═══════════════ -->
+  <div class="popup" id="popup">
+    <header class="pp-head">
+      <div class="pp-brand">
+        <svg class="ico pp-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        <div class="pp-brand-text">
+          <div class="pp-brand-name">HDrezka <span class="pp-arrow">→</span> Сервер</div>
+          <div class="pp-brand-sub" id="conn-sub">сервер на связи</div>
+        </div>
+      </div>
+      <div class="pp-head-actions">
+        <button type="button" class="icon-btn" id="copy-debug" title="Скопировать диагностику">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><rect x="9" y="9" width="12" height="12"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        </button>
+        <button type="button" class="icon-btn" id="toggle-settings" title="Настройки сервера">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="card hidden" id="settings">
+      <div class="card-head"><div class="card-title">Сервер загрузок</div></div>
+      <div class="card-body">
+        <label class="field">
+          <span class="field-label">Адрес сервера</span>
+          <input class="input mono" id="server-url" type="text" value="http://192.168.1.50:8080" spellcheck="false">
+        </label>
+        <label class="field">
+          <span class="field-label">Токен <span class="opt">(если включён на сервере)</span></span>
+          <input class="input mono" id="server-token" type="text" placeholder="необязательно" spellcheck="false">
+        </label>
+      </div>
+      <div class="card-foot">
+        <button class="btn btn-primary" id="save-settings" type="button">Сохранить</button>
+        <span class="foot-note" id="settings-status"></span>
+      </div>
+    </section>
+
+    <div class="seg seg-block" id="screen-switch">
+      <button type="button" class="seg-btn active" data-screen="send">Загрузка</button>
+      <button type="button" class="seg-btn" data-screen="queue">Очередь <span class="seg-count" id="queue-badge">6</span></button>
+    </div>
+
+    <!-- ═════ экран «Загрузка» ═════ -->
+    <section class="screen" id="screen-send">
+      <div class="card" id="page-card">
+        <div class="card-body" id="page-info"></div>
+      </div>
+
+      <div class="stepper" id="stepper">
+        <button type="button" class="step active" data-step="1"><span class="step-num">1</span><span class="step-label">Что качать</span></button>
+        <button type="button" class="step" data-step="2"><span class="step-num">2</span><span class="step-label">Параметры</span></button>
+        <button type="button" class="step" data-step="3"><span class="step-num">3</span><span class="step-label">Отправить</span></button>
+      </div>
+
+      <div class="card">
+        <div class="card-body" id="step-body"></div>
+      </div>
+
+      <div class="warn-line hidden" id="already"></div>
+
+      <div class="card">
+        <div class="card-foot wizard-foot">
+          <button class="btn" id="wiz-back" type="button">Назад</button>
+          <span class="wf-hint" id="wiz-hint"></span>
+          <button class="btn btn-primary" id="wiz-next" type="button">Далее</button>
+        </div>
+        <div class="status-line" id="action-status"></div>
+      </div>
+    </section>
+
+    <!-- ═════ экран «Очередь» ═════ -->
+    <section class="screen hidden" id="screen-queue">
+      <div class="kpi-mini" id="kpi-strip"></div>
+
+      <div class="seg seg-block" id="queue-filter">
+        <button type="button" class="seg-btn active" data-filter="all">Все</button>
+        <button type="button" class="seg-btn" data-filter="active">Активные</button>
+        <button type="button" class="seg-btn" data-filter="error">Ошибки</button>
+        <button type="button" class="seg-btn" data-filter="done">Готовые</button>
+      </div>
+
+      <div class="card">
+        <div class="queue-list" id="queue-list"></div>
+      </div>
+
+      <div class="server-widget" id="server-widget">
+        <span class="sw-dot" id="sw-dot"></span>
+        <span class="sw-free" id="sw-free">свободно 128.4 GB</span>
+        <span class="sw-path" id="sw-folder">/srv/media/downloads</span>
+        <span class="sw-spacer"></span>
+        <span class="sw-meta" id="sw-meta">ffmpeg · слотов 2/3</span>
+      </div>
+
+      <div class="queue-global">
+        <button class="btn btn-sm" id="resume-all" type="button">Возобновить всё</button>
+        <button class="btn btn-sm" id="stop-all" type="button">Остановить всё</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="stage-note">
+    Прототип №2 · данные ненастоящие · <a href="../index.html">все прототипы</a>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

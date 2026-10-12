@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
+import http from 'node:http';
+import https from 'node:https';
 import path from 'node:path';
-import { Readable, Transform } from 'node:stream';
+import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { spawn, spawnSync } from 'node:child_process';
 import { config } from './config.js';
@@ -207,6 +209,59 @@ async function downloadHttp(task, partPath, entry) {
   throw lastError ?? new Error('Нет доступных URL');
 }
 
+/**
+ * HTTP(S) GET на core-модулях с редиректами.
+ * Намеренно не fetch(): парсер undici в этой ситуации роняет ВЕСЬ процесс
+ * (AssertionError: assert(!this.paused) в Parser.finish), если соединение
+ * закрывают, пока тело стоит на паузе из-за backpressure (быстрый источник +
+ * медленный диск). Core-парсер (llhttp) такое переживает: поток просто
+ * завершается с ошибкой, и задача уходит на повтор.
+ */
+function httpGet(url, headers, signal, redirectsLeft = 5) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const transport = url.startsWith('https:') ? https : http;
+    const req = transport.get(url, { headers }, (res) => {
+      const status = res.statusCode ?? 0;
+      const location = res.headers.location;
+      if ([301, 302, 303, 307, 308].includes(status) && location && redirectsLeft > 0) {
+        res.resume();
+        let next;
+        try {
+          next = new URL(location, url).toString();
+        } catch {
+          settled = true;
+          reject(new Error(`Некорректный редирект: ${location}`));
+          return;
+        }
+        settled = true;
+        resolve(httpGet(next, headers, signal, redirectsLeft - 1));
+        return;
+      }
+      settled = true;
+      resolve(res);
+    });
+    req.on('error', (error) => {
+      if (!settled) reject(error);
+    });
+    if (signal) {
+      if (signal.aborted) {
+        settled = true;
+        req.destroy();
+        reject(new Error('Загрузка прервана'));
+        return;
+      }
+      signal.addEventListener(
+        'abort',
+        () => {
+          req.destroy(new Error('Загрузка прервана'));
+        },
+        { once: true },
+      );
+    }
+  });
+}
+
 async function fetchToFile({ task, url, partPath, startByte, entry }) {
   const headers = {
     'User-Agent': config.userAgent,
@@ -216,27 +271,24 @@ async function fetchToFile({ task, url, partPath, startByte, entry }) {
   if (task.referer) headers.Referer = task.referer;
   if (startByte > 0) headers.Range = `bytes=${startByte}-`;
 
-  const response = await fetch(url, {
-    headers,
-    signal: entry.controller.signal,
-    redirect: 'follow',
-  });
+  const res = await httpGet(url, headers, entry.controller.signal);
 
-  if (response.status !== 200 && response.status !== 206) {
-    throw new Error(`HTTP ${response.status} ${response.statusText || ''}`.trim());
+  if (res.statusCode !== 200 && res.statusCode !== 206) {
+    const statusLine = `HTTP ${res.statusCode} ${res.statusMessage || ''}`.trim();
+    res.resume(); // освободить соединение
+    throw new Error(statusLine);
   }
-  if (!response.body) throw new Error('Пустой ответ от сервера');
 
-  const isPartial = response.status === 206;
+  const isPartial = res.statusCode === 206;
   const append = isPartial && startByte > 0;
   let received = append ? startByte : 0;
   let total = 0;
 
   if (isPartial) {
-    const match = /bytes\s+\d+-\d+\/(\d+)/i.exec(response.headers.get('content-range') || '');
+    const match = /bytes\s+\d+-\d+\/(\d+)/i.exec(res.headers['content-range'] || '');
     total = match ? Number(match[1]) : 0;
   } else {
-    total = Number(response.headers.get('content-length') || 0);
+    total = Number(res.headers['content-length'] || 0);
   }
   if (!total && task.total_bytes) total = Number(task.total_bytes);
 
@@ -256,7 +308,7 @@ async function fetchToFile({ task, url, partPath, startByte, entry }) {
   });
 
   await pipeline(
-    Readable.fromWeb(response.body),
+    res,
     counter,
     fs.createWriteStream(partPath, { flags: append ? 'a' : 'w' }),
     { signal: entry.controller.signal },
@@ -387,6 +439,23 @@ export function resumeAll() {
   return rows.length;
 }
 
+/** Ставит на паузу всё, что качается или стоит в очереди. */
+export function pauseAll() {
+  const rows = db.listTaskRowsByStatuses(['queued', 'downloading']);
+  for (const row of rows) {
+    const entry = active.get(row.id);
+    if (entry) {
+      // активная загрузка: прерываем, статус «paused» выставит воркер
+      entry.mode = 'pause';
+      entry.controller.abort();
+      continue;
+    }
+    db.updateTask(row.id, { status: 'paused' });
+  }
+  if (rows.length > 0) log.warn(`Поставлены на паузу задачи: ${rows.length}`);
+  return rows.length;
+}
+
 export function cancelTask(id) {
   const entry = active.get(id);
   if (entry) {
@@ -428,7 +497,13 @@ export function resumeTask(id) {
 export function retryTask(id) {
   const task = db.getTask(id);
   if (!task) return false;
-  db.updateTask(id, { status: 'queued', attempts: 0, next_attempt_at: 0, error: null });
+  db.updateTask(id, {
+    status: 'queued',
+    attempts: 0,
+    next_attempt_at: 0,
+    error: null,
+    queue_hidden: 0,
+  });
   return true;
 }
 

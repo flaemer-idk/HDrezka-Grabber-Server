@@ -1,113 +1,293 @@
-<!doctype html>
-<html lang="ru">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HDrezka Grabber — сервер загрузок</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <header>
-      <h1>HDrezka Grabber <span class="muted">— сервер загрузок</span></h1>
-      <div id="server-info" class="server-info">Загрузка…</div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>idk downloader</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ======================= SIDEBAR ======================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-text">
+        <div class="brand-name">idk downloader</div>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="Main navigation" data-i18n-aria="nav.aria">
+      <a class="nav-item" href="#/queue" data-nav="queue">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        <span class="nav-label" data-i18n="nav.queue">Queue</span>
+      </a>
+      <a class="nav-item" href="#/history" data-nav="history">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+        <span class="nav-label" data-i18n="nav.history">History</span>
+      </a>
+      <a class="nav-item" href="#/settings" data-nav="settings">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l-.06.06a2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="nav-label" data-i18n="nav.settings">Settings</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="lang-switch" id="lang-switch" role="group" aria-label="Interface language" data-i18n-aria="lang.aria"></div>
+
+      <div class="server-widget">
+        <div class="sw-head">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg>
+          <span data-i18n="server.title">Server</span>
+        </div>
+        <div class="sw-free" id="sw-free">—</div>
+        <div class="sw-bar"><div class="sw-bar-fill" id="sw-bar-fill" style="width:0%"></div></div>
+        <div class="sw-total" id="sw-total">—</div>
+        <div class="sw-row sw-path">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M22 19V9a2 2 0 0 0-2-2h-8l-2-3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2z"/></svg>
+          <span class="sw-path-text" id="sw-folder">—</span>
+        </div>
+        <div class="sw-row sw-ffmpeg">
+          <span class="sw-dot" id="sw-dot" aria-hidden="true"></span>
+          <span id="sw-meta">—</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ======================= MAIN ======================= -->
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title" id="page-title">Queue</h1>
+        <span class="page-sub" id="page-sub"></span>
+      </div>
+      <div class="topbar-actions" id="topbar-actions"></div>
     </header>
 
-    <main>
-      <section class="card">
-        <h2>Добавить по прямой ссылке</h2>
-        <form id="add-form" class="grid-form">
-          <label>
-            Ссылка (mp4 / m3u8 / vtt)
-            <input name="url" type="url" placeholder="https://…mp4" required />
-          </label>
-          <label>
-            Имя файла (необязательно)
-            <input name="filename" type="text" placeholder="Будет собрано из настроек" />
-          </label>
-          <label>
-            Referer (необязательно)
-            <input name="referer" type="text" placeholder="https://hdrezka.ag/…" />
-          </label>
-          <div class="form-actions">
-            <button type="submit" class="primary">Добавить в очередь</button>
-            <span id="add-status" class="hint"></span>
-          </div>
-        </form>
-        <p class="hint">
-          Обычно сюда ничего вставлять не нужно: расширение само находит ссылку, озвучку,
-          качество и год на странице фильма и отправляет задачу на этот сервер. Поле нужно,
-          только если у вас уже есть прямая ссылка на файл.
-        </p>
-      </section>
+    <div class="content">
 
-      <section class="card">
-        <div class="row">
-          <h2>Очередь</h2>
-          <span id="queue-status" class="hint"></span>
-          <div class="spacer"></div>
-          <button id="stop-all" type="button">Остановить все</button>
-          <button id="resume-all" type="button">Возобновить все</button>
-          <button id="retry-failed" type="button">Повторить сбойные</button>
-          <button id="clear-finished" type="button">Очистить завершённые</button>
+      <!-- ============ QUEUE VIEW ============ -->
+      <section class="view" id="view-queue">
+        <div class="kpi-strip">
+          <div class="kpi">
+            <div class="kpi-label"><i class="kpi-dot kd-blue"></i><span data-i18n="kpi.downloading">Downloading</span></div>
+            <div class="kpi-value" id="kpi-downloading">0</div>
+            <div class="kpi-sub" id="kpi-downloading-sub">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label"><i class="kpi-dot kd-gray"></i><span data-i18n="kpi.queued">Queued</span></div>
+            <div class="kpi-value" id="kpi-queued">0</div>
+            <div class="kpi-sub" id="kpi-queued-sub">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label"><i class="kpi-dot kd-green"></i><span data-i18n="kpi.done">Done</span></div>
+            <div class="kpi-value" id="kpi-done">0</div>
+            <div class="kpi-sub" id="kpi-done-sub">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label"><i class="kpi-dot kd-amber"></i><span data-i18n="kpi.left">Remaining</span></div>
+            <div class="kpi-value" id="kpi-left">—</div>
+            <div class="kpi-sub" id="kpi-left-sub">—</div>
+          </div>
         </div>
-        <div id="tasks" class="tasks"></div>
+
+        <div class="queue-list" id="queue-list"></div>
+
+        <div class="empty-state" id="queue-empty" hidden>
+          <svg class="ico empty-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <div class="empty-title" data-i18n="queue.emptyTitle">The queue is empty</div>
+          <div class="empty-text" data-i18n="queue.emptyText">Send a task from the browser extension or add a direct link.</div>
+          <button class="btn btn-primary" type="button" id="queue-empty-add" data-i18n="top.add">Add by link</button>
+        </div>
       </section>
 
-      <section class="card">
-        <h2>Настройки</h2>
-        <form id="settings-form" class="grid-form">
-          <label>
-            Папка загрузок на сервере
-            <input name="download_dir" type="text" />
-          </label>
-          <label>
-            Одновременных загрузок
-            <input name="max_concurrent" type="number" min="1" max="16" />
-          </label>
-          <label>
-            Попыток на задачу
-            <input name="max_attempts" type="number" min="1" max="50" />
-          </label>
-          <label>
-            Пауза между попытками, сек
-            <input name="retry_delay_s" type="number" min="1" max="3600" />
-          </label>
-          <label class="wide checkbox-label">
-            <input type="checkbox" name="overwrite_existing" />
-            Перезаписывать готовые файлы при повторной загрузке (без « (1)»)
-          </label>
-          <label class="wide">
-            Папка медиатеки (пусто — качать в папку загрузок)
-            <input name="library_dir" type="text" placeholder="/mnt/media" />
-          </label>
-          <label class="wide">
-            Категории → папки медиатеки (по строке: раздел = папка)
-            <textarea name="library_categories" rows="5" spellcheck="false"></textarea>
-          </label>
-          <label class="wide">
-            Шаблон имени: фильмы
-            <input name="filename_template_film" type="text" />
-          </label>
-          <label class="wide">
-            Шаблон имени: сериалы
-            <input name="filename_template_series" type="text" />
-          </label>
-          <label class="wide">
-            Шаблон имени: субтитры
-            <input name="filename_template_subtitle" type="text" />
-          </label>
-          <div class="form-actions">
-            <button type="submit" class="primary">Сохранить</button>
-            <span id="settings-status" class="hint"></span>
+      <!-- ============ HISTORY VIEW ============ -->
+      <section class="view" id="view-history">
+        <div class="table-toolbar">
+          <div class="search">
+            <svg class="ico search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+            <input class="input search-input" type="search" id="history-search" placeholder="Search by file name…" autocomplete="off" data-i18n-placeholder="history.searchPh">
+          </div>
+          <div class="seg" id="history-filter" role="tablist" aria-label="Filter by status" data-i18n-aria="history.filterAria">
+            <button type="button" class="seg-btn active" data-filter="all" data-i18n="history.fAll">All</button>
+            <button type="button" class="seg-btn" data-filter="done" data-i18n="history.fDone">Done</button>
+            <button type="button" class="seg-btn" data-filter="canceled" data-i18n="history.fCanceled">Cancelled</button>
+          </div>
+          <div class="toolbar-spacer"></div>
+          <div class="history-count" id="history-count">0 of 0</div>
+        </div>
+
+        <div class="table-card">
+          <table class="table">
+            <thead>
+              <tr>
+                <th data-i18n="history.colFile">File</th>
+                <th class="th-status" data-i18n="history.colStatus">Status</th>
+                <th class="th-size" data-i18n="history.colSize">Size</th>
+                <th class="th-date" data-i18n="history.colDate">Completed</th>
+                <th class="th-act" data-i18n="history.colAct">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ SETTINGS VIEW ============ -->
+      <section class="view" id="view-settings">
+        <form class="card settings-card" id="settings-form" autocomplete="off">
+          <div class="card-head">
+            <div>
+              <h2 class="card-title" data-i18n="settings.title">Settings</h2>
+              <div class="card-sub" data-i18n="sub.settings">Downloads, media library and name templates</div>
+            </div>
+          </div>
+
+          <div class="set-section">
+            <h3 class="set-title" data-i18n="set.interface">Interface</h3>
+            <div class="set-grid">
+              <label class="field">
+                <span class="field-label" data-i18n="set.lang">Interface language</span>
+                <select class="input" id="set-lang">
+                  <option value="en">English</option>
+                  <option value="ru">Русский</option>
+                </select>
+                <span class="field-hint" data-i18n="set.langHint">Applies immediately, the choice is remembered.</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="set-section">
+            <h3 class="set-title" data-i18n="set.downloads">Downloads</h3>
+            <div class="set-grid">
+              <label class="field span2">
+                <span class="field-label" data-i18n="set.dir">Download folder on the server</span>
+                <input class="input mono" type="text" id="set-dir">
+                <span class="field-hint" data-i18n="set.dirHint">Absolute path where files land before being sorted into the library.</span>
+              </label>
+              <label class="field">
+                <span class="field-label" data-i18n="set.simul">Simultaneous downloads</span>
+                <input class="input" type="number" id="set-max-concurrent" min="1" max="16" step="1">
+                <span class="field-hint" data-i18n="set.range116">From 1 to 16</span>
+              </label>
+              <label class="field">
+                <span class="field-label" data-i18n="set.retries">Attempts per task</span>
+                <input class="input" type="number" id="set-max-attempts" min="1" max="50" step="1">
+                <span class="field-hint" data-i18n="set.range150">From 1 to 50</span>
+              </label>
+              <label class="field">
+                <span class="field-label" data-i18n="set.delay">Delay between attempts, sec</span>
+                <input class="input" type="number" id="set-delay-s" min="1" max="3600" step="1">
+              </label>
+              <label class="field-check span2">
+                <input type="checkbox" id="set-overwrite">
+                <span data-i18n="set.overwrite">Overwrite finished files on re-download (no “ (1)” suffix)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="set-section">
+            <h3 class="set-title" data-i18n="set.library">Media library</h3>
+            <div class="set-grid">
+              <label class="field span2">
+                <span class="field-label" data-i18n="set.libDir">Library folder</span>
+                <input class="input mono" type="text" id="set-library" placeholder="/mnt/media">
+                <span class="field-hint" data-i18n="set.libHint">Empty — download into the downloads folder; otherwise files are sorted into the library by categories.</span>
+              </label>
+              <label class="field span2">
+                <span class="field-label" data-i18n="set.cats">Categories → library folders</span>
+                <textarea class="input mono" id="set-categories" rows="5" spellcheck="false"></textarea>
+                <span class="field-hint" data-i18n-html="set.catsHint">One line per category: <code>section = folder</code>, e.g. <code>films = Movies</code>. The key <code>default</code> catches everything not listed.</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="set-section">
+            <h3 class="set-title" data-i18n="set.tpl">Name templates</h3>
+            <div class="set-grid">
+              <label class="field span2">
+                <span class="field-label" data-i18n="set.tplFilm">Name template: movies</span>
+                <input class="input mono" type="text" id="set-tpl-film">
+                <div class="tpl-preview" id="prev-film"></div>
+              </label>
+              <label class="field span2">
+                <span class="field-label" data-i18n="set.tplSeries">Name template: series</span>
+                <input class="input mono" type="text" id="set-tpl-series">
+                <div class="tpl-preview" id="prev-series"></div>
+              </label>
+              <label class="field span2">
+                <span class="field-label" data-i18n="set.tplSubs">Name template: subtitles</span>
+                <input class="input mono" type="text" id="set-tpl-subs">
+                <div class="tpl-preview" id="prev-subs"></div>
+              </label>
+              <div class="hint span2">
+                <div class="hint-title" data-i18n="set.phTitle">Template placeholders</div>
+                <p data-i18n="set.phHint">Click a placeholder to insert it into the last edited template.</p>
+                <div class="ph-list" id="ph-list"></div>
+                <p class="ph-note" data-i18n="set.slashHint">“/” in a template creates a subfolder. The extension (.mp4 / .vtt) is appended automatically.</p>
+              </div>
+            </div>
+            <div class="set-note" data-i18n="set.tplExamples">Preview examples: movie — “Minions” (2015); series — “The Shining” (1997), 3 episodes.</div>
+          </div>
+
+          <div class="settings-foot">
+            <span class="foot-note" data-i18n="set.footNote">Settings are stored on the server; “Simultaneous downloads” applies immediately.</span>
+            <div class="foot-actions">
+              <button type="button" class="btn" id="settings-revert" data-i18n="set.revert">Revert</button>
+              <button type="submit" class="btn btn-primary">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                <span data-i18n="set.save">Save</span>
+              </button>
+            </div>
           </div>
         </form>
-        <p class="hint">
-          Плейсхолдеры: %title%, %orig_title%, %quality%, %voiceover%, %season%, %season_id%,
-          %episode%, %episode_id%, %sxxexx%, %movie_id%, %subtitle_lang%. Символ «/» создаёт подпапку.
-        </p>
       </section>
-    </main>
 
-    <script src="app.js"></script>
-  </body>
+    </div>
+  </main>
+</div>
+
+<!-- ======================= MODAL ======================= -->
+<div class="modal-overlay" id="modal-overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head">
+      <h2 class="modal-title" id="modal-title" data-i18n="modal.title">Add by link</h2>
+      <button class="icon-btn" type="button" id="modal-close" aria-label="Close" data-i18n-aria="modal.close">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form id="add-form" class="modal-body" novalidate>
+      <label class="field">
+        <span class="field-label"><span data-i18n="modal.url">Direct link (mp4 / m3u8 / vtt)</span> <span class="req">*</span></span>
+        <input class="input mono" type="url" id="f-url" placeholder="https://cdn.example/video/12345.mp4" required>
+        <span class="field-error" id="f-url-error" data-i18n="modal.urlErr">Enter a direct link to a file.</span>
+        <span class="field-hint" data-i18n="modal.urlHint">Normally the browser extension sends tasks here by itself — use this form only when you already have a direct file link.</span>
+      </label>
+      <label class="field">
+        <span class="field-label" data-i18n="modal.name">File name</span>
+        <input class="input mono" type="text" id="f-name" placeholder="movie (2024).mp4" data-i18n-placeholder="modal.namePh">
+        <span class="field-hint" data-i18n="modal.nameHint">Optional. Empty — taken from the link.</span>
+      </label>
+      <label class="field">
+        <span class="field-label" data-i18n="modal.referer">Referer</span>
+        <input class="input mono" type="text" id="f-referer" placeholder="https://hdrezka.example/">
+        <span class="field-hint" data-i18n="modal.refererHint">Optional. Sent with requests to the CDN.</span>
+      </label>
+    </form>
+    <div class="modal-foot">
+      <button class="btn" type="button" id="modal-cancel" data-i18n="modal.cancel">Cancel</button>
+      <button class="btn btn-primary" type="submit" form="add-form">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span data-i18n="modal.add">Add to queue</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
 </html>

@@ -8,6 +8,7 @@ const ext = globalThis.browser ?? globalThis.chrome;
 const $ = (selector) => document.querySelector(selector);
 
 const STORAGE_KEY = 'hdzg-server-settings';
+const UI_KEY = 'hdzg-server-ui';
 const STATUS_LABELS = {
   queued: 'в очереди',
   downloading: 'скачивается',
@@ -15,6 +16,18 @@ const STATUS_LABELS = {
   done: 'готово',
   error: 'ошибка',
   canceled: 'отменена',
+};
+
+/** Иконки действий в очереди (inline SVG, как на сайте). */
+const ACTION_ICONS = {
+  pause:
+    '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><line x1="9" y1="5" x2="9" y2="19"/><line x1="15" y1="5" x2="15" y2="19"/></svg>',
+  cancel:
+    '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+  resume:
+    '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><polygon points="7 4 20 12 7 20 7 4"/></svg>',
+  retry:
+    '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><polyline points="21 4 21 10 15 10"/><path d="M20.5 14a8.5 8.5 0 1 1-1.9-8.4L21 8"/></svg>',
 };
 
 const state = {
@@ -28,19 +41,36 @@ const state = {
   pollTimer: null,
   lastResolve: null,
   lastError: null,
+  // ручной выбор серий (режим «Выбрать серии…»)
+  selectedEpisodes: new Set(), // ключи вида "сезон:серия"
+  activeSeason: null,
+  // состояние интерфейса
+  queueCollapsed: false,
+  queueBusy: false,
+  queueSignature: '',
+  initBusy: false,
+  initQueued: false,
 };
 
 /* ─────────────────────────── настройки и сервер ─────────────────────────── */
 
 async function loadSettings() {
-  const stored = await ext.storage.local.get(STORAGE_KEY);
+  const stored = await ext.storage.local.get([STORAGE_KEY, UI_KEY]);
   state.settings = { ...state.settings, ...(stored[STORAGE_KEY] || {}) };
+
+  const ui = stored[UI_KEY] || {};
+  state.queueCollapsed = Boolean(ui.queueCollapsed);
+  applyQueueCollapsed();
+
   $('#server-url').value = state.settings.serverUrl || '';
   $('#server-token').value = state.settings.token || '';
   if (!state.settings.serverUrl) $('#settings').classList.remove('hidden');
+  updateConnSub(false);
 }
 
 async function saveSettings() {
+  const previousUrl = state.settings.serverUrl;
+
   state.settings = {
     serverUrl: $('#server-url').value.trim().replace(/\/+$/, ''),
     token: $('#server-token').value.trim(),
@@ -48,7 +78,11 @@ async function saveSettings() {
   await ext.storage.local.set({ [STORAGE_KEY]: state.settings });
   $('#settings-status').textContent = 'Сохранено';
   setTimeout(() => ($('#settings-status').textContent = ''), 2000);
+  updateConnSub(false);
   updateQueueVisibility();
+
+  // Адрес появился или сменился — только теперь имеет смысл читать страницу.
+  if (state.settings.serverUrl !== previousUrl) init();
   refreshQueue();
 }
 
@@ -58,10 +92,27 @@ async function serverApi(path, options = {}) {
   if (state.settings.token) headers['X-Auth-Token'] = state.settings.token;
   if (options.body) headers['Content-Type'] = 'application/json';
 
-  const response = await fetch(state.settings.serverUrl + path, { ...options, headers });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-  return data;
+  // Таймаут обязателен: без него недоступный сервер подвешивает запросы (а попап
+  // опрашивает состояние раз в 3 с), и интерфейс начинает тормозить.
+  const timeout = options.timeout ?? 5000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(state.settings.serverUrl + path, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('Сервер не отвечает (таймаут)');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /* ──────────────────── функции, выполняемые на странице ──────────────────── */
@@ -224,11 +275,54 @@ async function pageDetect() {
   }
   if (!year) year = /(?:19|20)\d{2}/.exec(location.pathname)?.[0] ?? null;
 
+  // Озвучки собираем здесь же: раньше это был второй прогон по странице с повторным
+  // разбором всего HTML, а на тяжёлых страницах это заметно тормозит попап.
+  const translators = [];
+  for (const item of document.querySelectorAll('.b-translator__item')) {
+    const id = item.getAttribute('data-translator_id');
+    translators.push({
+      id,
+      title:
+        (item.getAttribute('title') || '').trim() ||
+        (id === '110' ? 'Оригинал' : id === '0' ? 'Озвучка №1' : `Озвучка ${id}`),
+      flag: item.querySelector('img')?.src.split('/').at(-1)?.split('.')[0] || null,
+      prem: item.classList.contains('b-prem_translator'),
+      is_camrip: item.getAttribute('data-camrip'),
+      is_ads: item.getAttribute('data-ads'),
+      is_director: item.getAttribute('data-director'),
+    });
+  }
+
+  if (translators.length === 0 && call && args[0] && args[1]) {
+    // Озвучек в разметке нет — берём ту, что в вызове плеера.
+    const id = args[1];
+    let title = id === '110' ? 'Оригинал' : id === '0' ? 'Озвучка №1' : `Озвучка ${id}`;
+
+    for (const row of document.querySelectorAll('.b-post__info tr')) {
+      if (row.cells?.[0]?.textContent?.trim() === 'В переводе:') {
+        title = row.cells[1]?.textContent?.trim() || title;
+        break;
+      }
+    }
+
+    const isMovie = call.initiator === 'initCDNMoviesEvents';
+    translators.push({
+      id,
+      title,
+      flag: null,
+      prem: false,
+      is_camrip: isMovie ? (args[2] ?? null) : null,
+      is_ads: isMovie ? (args[3] ?? null) : null,
+      is_director: isMovie ? (args[4] ?? null) : null,
+    });
+  }
+
   return {
     pageType,
     movie,
     quality,
     year,
+    translators,
     hasCall: Boolean(call),
     callArgs: args.slice(0, 6),
     url: location.href.split('#')[0],
@@ -267,57 +361,6 @@ async function pageSeasons() {
   }
 
   return seasons;
-}
-
-/** Список озвучек со страницы (MAIN-мир, только DOM). */
-async function pageVoiceOvers() {
-  const translators = [];
-  const items = document.querySelectorAll('.b-translator__item');
-
-  if (items.length > 0) {
-    for (const item of items) {
-      const id = item.getAttribute('data-translator_id');
-      const title = (item.getAttribute('title') || '').trim();
-      translators.push({
-        id,
-        title: title || (id === '110' ? 'Оригинал' : id === '0' ? 'Озвучка №1' : `Озвучка ${id}`),
-        flag: item.querySelector('img')?.src.split('/').at(-1)?.split('.')[0] || null,
-        prem: item.classList.contains('b-prem_translator'),
-        is_camrip: item.getAttribute('data-camrip'),
-        is_ads: item.getAttribute('data-ads'),
-        is_director: item.getAttribute('data-director'),
-      });
-    }
-    return translators;
-  }
-
-  const config = document.documentElement.outerHTML.match(
-    /sof\.tv\.initCDN(Movies|Series)Events\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*([^,)]*)\s*,\s*([^,)]*)\s*,\s*([^,)]*)/,
-  );
-  if (!config) return [];
-
-  const initiator = config[1] === 'Movies' ? 'initCDNMoviesEvents' : 'initCDNSeriesEvents';
-  const id = config[3];
-  let title = id === '110' ? 'Оригинал' : id === '0' ? 'Озвучка №1' : `Озвучка ${id}`;
-
-  for (const row of document.querySelectorAll('.b-post__info tr')) {
-    if (row.cells?.[0]?.textContent?.trim() === 'В переводе:') {
-      title = row.cells[1]?.textContent?.trim() || title;
-      break;
-    }
-  }
-
-  return [
-    {
-      id,
-      title,
-      flag: null,
-      prem: false,
-      is_camrip: initiator === 'initCDNMoviesEvents' ? config[4].trim() : null,
-      is_ads: initiator === 'initCDNMoviesEvents' ? config[5].trim() : null,
-      is_director: initiator === 'initCDNMoviesEvents' ? config[6].trim() : null,
-    },
-  ];
 }
 
 /**
@@ -488,28 +531,21 @@ function parseEpisodes(data, seasons) {
   return seasons;
 }
 
-function sliceSeasons(seasons, seasonFrom, episodeFrom, seasonTo, episodeTo) {
-  const sortedKeys = Object.keys(seasons).sort((a, b) => parseInt(a) - parseInt(b));
-  if (parseInt(seasonTo) < 0) {
-    seasonTo = seasonTo === '-2' ? sortedKeys[sortedKeys.length - 1] : seasonFrom;
-    episodeTo = '';
-  }
+/* ─────────────────────── выбор серий (чипы) ─────────────────────── */
 
-  const result = {};
-  for (const seasonKey of sortedKeys) {
-    if (parseInt(seasonKey) < parseInt(seasonFrom) || parseInt(seasonKey) > parseInt(seasonTo)) continue;
+const epKey = (season, episode) => `${season}:${episode}`;
 
-    const { title, episodes } = seasons[seasonKey];
-    let list = [...episodes].sort((a, b) => parseInt(a.id) - parseInt(b.id));
-    if (seasonKey === seasonFrom) {
-      list = list.filter((episode) => parseInt(episode.id) >= parseInt(episodeFrom));
-    }
-    if (seasonKey === seasonTo && episodeTo !== '') {
-      list = list.filter((episode) => parseInt(episode.id) <= parseInt(episodeTo));
-    }
-    result[seasonKey] = { title, episodes: list };
-  }
-  return result;
+function seasonKeys() {
+  return Object.keys(state.seasons).sort((a, b) => parseInt(a) - parseInt(b));
+}
+
+function selectedEpisodeList() {
+  return Array.from(state.selectedEpisodes)
+    .map((key) => {
+      const [season, episode] = key.split(':');
+      return { season, episode };
+    })
+    .sort((a, b) => parseInt(a.season) - parseInt(b.season) || parseInt(a.episode) - parseInt(b.episode));
 }
 
 function pickQuality(qualities, wanted) {
@@ -534,7 +570,11 @@ function setPageInfo(html, isError = false) {
 }
 
 function setStatus(text) {
-  $('#action-status').textContent = text || '';
+  const el = $('#action-status');
+  el.textContent = text || '';
+  const value = String(text || '');
+  el.classList.toggle('bad', /^(Ошибка|Не удалось|Нет связи)/.test(value));
+  el.classList.toggle('good', /^Отправлено/.test(value));
 }
 
 function showControls(visible) {
@@ -607,66 +647,92 @@ function renderSubtitles() {
 
 function renderSeasons() {
   const page = state.page;
-  const seasons = state.seasons;
-  const keys = Object.keys(seasons).sort((a, b) => parseInt(a) - parseInt(b));
-  const isSerial = page.pageType === 'SERIAL';
+  const keys = seasonKeys();
+  const isSerial = page?.pageType === 'SERIAL';
 
   $('#range-block').classList.toggle('hidden', !isSerial);
-  if (!isSerial || keys.length === 0) return;
+  if (!isSerial) return;
 
-  const currentSeason = page.movie.season;
-  const currentEpisode = page.movie.episode;
-
-  const fillSeasons = (select, options, selected) => {
-    select.innerHTML = '';
-    for (const [value, label] of options) {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = label;
-      select.appendChild(option);
+  if (keys.length) {
+    // Активный сезон для сетки: текущий со страницы, иначе первый доступный.
+    const currentSeason = String(page.movie.season ?? keys[0]);
+    if (!state.activeSeason || !keys.includes(String(state.activeSeason))) {
+      state.activeSeason = keys.includes(currentSeason) ? currentSeason : keys[0];
     }
-    select.value = selected;
-  };
 
-  const seasonOptions = keys.map((key) => [key, seasons[key].title || `Сезон ${key}`]);
-  fillSeasons($('#season-from'), seasonOptions, currentSeason);
+    // Стартовый выбор — текущая серия, чтобы сразу было видно, что отмечено.
+    if (state.selectedEpisodes.size === 0 && page.movie.season && page.movie.episode) {
+      state.selectedEpisodes.add(epKey(page.movie.season, page.movie.episode));
+    }
+  }
 
-  const toOptions = [...seasonOptions, ['-1', 'конец сезона'], ['-2', 'конец сериала']];
-  fillSeasons($('#season-to'), toOptions, '-2');
-
-  fillEpisodesFrom();
-  $('#episode-to').innerHTML = '<option value="">до последней</option>';
+  renderEpisodeGrid();
 }
 
-function fillEpisodesFrom() {
-  const seasonFrom = $('#season-from').value;
-  const episodes = state.seasons[seasonFrom]?.episodes ?? [];
-  const select = $('#episode-from');
-  select.innerHTML = '';
-  for (const episode of episodes) {
-    const option = document.createElement('option');
-    option.value = episode.id;
-    option.textContent = episode.title || `Серия ${episode.id}`;
-    select.appendChild(option);
+/** Сезоны-табы и сетка чипов для режима «Выбрать серии…». */
+function renderEpisodeGrid() {
+  const keys = seasonKeys();
+
+  const tabs = $('#season-tabs');
+  tabs.innerHTML = '';
+  for (const key of keys) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `season-tab${String(key) === String(state.activeSeason) ? ' on' : ''}`;
+    button.dataset.season = key;
+    button.textContent = state.seasons[key].title || `Сезон ${key}`;
+    tabs.appendChild(button);
   }
-  const currentEpisode = state.page?.movie?.episode;
-  if (state.page?.movie?.season === seasonFrom && currentEpisode) select.value = currentEpisode;
+
+  const grid = $('#ep-grid');
+  grid.innerHTML = '';
+
+  const episodes = state.seasons[state.activeSeason]?.episodes ?? [];
+  if (!episodes.length) {
+    grid.innerHTML = '<div class="hint">Серии не найдены. Откройте страницу сериала и обновите её (F5).</div>';
+  }
+
+  for (const episode of episodes) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `ep-chip${state.selectedEpisodes.has(epKey(state.activeSeason, episode.id)) ? ' on' : ''}`;
+    button.dataset.episode = episode.id;
+    button.title = episode.title || `Серия ${episode.id}`;
+    button.textContent = episode.id;
+    grid.appendChild(button);
+  }
+
+  updateEpisodeSummary();
+}
+
+function updateEpisodeSummary() {
+  const count = state.selectedEpisodes.size;
+  const el = $('#ep-summary');
+  const word = count === 1 ? 'серия' : count > 1 && count < 5 ? 'серии' : 'серий';
+  el.textContent = count ? `Выбрано: ${count} ${word}` : 'Ничего не выбрано';
+  el.classList.toggle('bad', count === 0);
 }
 
 function updateQueueVisibility() {
   $('#queue').classList.toggle('hidden', !state.settings.serverUrl);
 }
 
+/** Свёрнутая очередь: сам список скрыт, шапка со статистикой остаётся. */
+function applyQueueCollapsed() {
+  $('#queue').classList.toggle('collapsed', state.queueCollapsed);
+  $('#queue-toggle').setAttribute('aria-expanded', String(!state.queueCollapsed));
+}
+
 function queueButtons(task) {
   const buttons = [];
   if (task.status === 'downloading' || task.status === 'queued') {
-    buttons.push(['pause', '⏸', 'Пауза']);
-    buttons.push(['cancel', '✕', 'Отменить']);
+    buttons.push(['pause', ACTION_ICONS.pause, 'Пауза']);
+    buttons.push(['cancel', ACTION_ICONS.cancel, 'Отменить']);
   } else if (task.status === 'paused') {
-    buttons.push(['resume', '▶', 'Продолжить']);
-    buttons.push(['cancel', '✕', 'Отменить']);
+    buttons.push(['resume', ACTION_ICONS.resume, 'Продолжить']);
+    buttons.push(['cancel', ACTION_ICONS.cancel, 'Отменить']);
   } else if (task.status === 'error' || task.status === 'canceled') {
-    buttons.push(['retry', '↻', 'Повторить']);
+    buttons.push(['retry', ACTION_ICONS.retry, 'Повторить']);
   }
 
   if (buttons.length === 0) return '';
@@ -674,7 +740,7 @@ function queueButtons(task) {
   return `<span class="q-actions">${buttons
     .map(
       ([action, icon, title]) =>
-        `<button type="button" class="q-btn" data-id="${task.id}" data-action="${action}" title="${title}">${icon}</button>`,
+        `<button type="button" class="q-btn ${action === 'cancel' ? 'act-danger' : 'act-accent'}" data-id="${task.id}" data-action="${action}" title="${title}">${icon}</button>`,
     )
     .join('')}</span>`;
 }
@@ -682,7 +748,9 @@ function queueButtons(task) {
 function renderQueue(stateData) {
   const stats = stateData?.stats;
   $('#queue-stats').textContent = stats
-    ? `↓${stats.downloading} · ⏳${stats.queued} · ✓${stats.done}${stats.error ? ` · ✕${stats.error}` : ''}`
+    ? `скачивается ${stats.downloading} · очередь ${stats.queued} · готово ${stats.done}` +
+      (stats.paused ? ` · пауза ${stats.paused}` : '') +
+      (stats.error ? ` · ошибок ${stats.error}` : '')
     : '';
 
   const list = $('#queue-list');
@@ -726,6 +794,41 @@ function formatBytes(bytes) {
     i++;
   }
   return `${value.toFixed(i === 0 ? 0 : value >= 100 ? 0 : 1)} ${units[i]}`;
+}
+
+/** Строка состояния сервера под попапом (свободное место, папка, слоты). */
+function renderServerWidget(data) {
+  const server = data?.server;
+  const dot = $('#sw-dot');
+
+  if (!server) {
+    dot?.classList.add('bad');
+    $('#sw-free').textContent = 'нет данных';
+    $('#sw-folder').textContent = '—';
+    $('#sw-meta').textContent = '';
+    return;
+  }
+
+  dot?.classList.remove('bad');
+  $('#sw-free').textContent = server.freeSpace ? `свободно ${formatBytes(server.freeSpace)}` : 'место: —';
+  $('#sw-folder').textContent = server.downloadDir || '—';
+  const slots = data?.settings?.max_concurrent ?? '—';
+  $('#sw-meta').textContent = `${server.ffmpeg ? 'ffmpeg' : 'без ffmpeg'} · слотов ${server.active ?? 0}/${slots}`;
+}
+
+/** Подпись под названием: связь с сервером. */
+function updateConnSub(online) {
+  const el = $('#conn-sub');
+  if (!el) return;
+
+  if (!state.settings.serverUrl) {
+    el.textContent = 'адрес сервера не указан — откройте ⚙';
+    el.classList.add('bad');
+    return;
+  }
+
+  el.textContent = online ? `сервер на связи · ${state.settings.serverUrl.replace(/^https?:\/\//, '')}` : 'нет связи с сервером';
+  el.classList.toggle('bad', !online);
 }
 
 function escapeHtml(value) {
@@ -828,67 +931,91 @@ async function applyResolvedData(data) {
 }
 
 async function init() {
-  await loadSettings();
-  updateQueueVisibility();
+  if (state.initBusy) {
+    state.initQueued = true;
+    return;
+  }
+  state.initBusy = true;
 
   try {
-    await getActiveTab();
-    const page = await runInPage(pageDetect);
+    await loadSettings();
+    updateQueueVisibility();
 
-    if (!page?.movie) {
-      state.page = page;
-      const snippet = page?.title ? `<span class="meta">${escapeHtml(page.title)}</span>` : '';
+    // Пока адрес сервера не указан — страницу не читаем. Раньше детект страницы,
+    // запрос ссылок и разбор HTML стартовали сразу при открытии попапа и на тяжёлых
+    // страницах подтормаживали интерфейс (в том числе когда человек вводил адрес
+    // в настройках). Сохранили адрес — init() вызывается заново (см. saveSettings).
+    if (!state.settings.serverUrl) {
+      state.page = null;
       setPageInfo(
-        `<span class="name">Это не страница фильма или сериала</span>${snippet}` +
-          `<span class="meta">Откройте страницу фильма/сериала и нажмите иконку расширения снова.` +
-          ` Если страница правильная — нажмите 🐞 и пришлите диагностику.</span>`,
-        true,
+        `<span class="name">Сначала укажите адрес сервера</span>` +
+          `<span class="meta">Откройте настройки (шестерёнка), вставьте адрес вида http://192.168.1.100:8080 и нажмите «Сохранить».</span>`,
       );
       showControls(false);
       return;
     }
 
-    state.page = page;
-
     try {
-      state.voiceovers = (await runInPage(pageVoiceOvers)) || [];
-    } catch {
-      state.voiceovers = [];
+      await getActiveTab();
+      const page = await runInPage(pageDetect);
+
+      if (!page?.movie) {
+        state.page = page;
+        const snippet = page?.title ? `<span class="meta">${escapeHtml(page.title)}</span>` : '';
+        setPageInfo(
+          `<span class="name">Это не страница фильма или сериала</span>${snippet}` +
+            `<span class="meta">Откройте страницу фильма/сериала и нажмите иконку расширения снова.` +
+            ` Если страница правильная — скопируйте диагностику (значок в шапке) и пришлите её.</span>`,
+          true,
+        );
+        showControls(false);
+        return;
+      }
+
+      state.page = page;
+      // Озвучки приходят вместе с детектом страницы — второй прогон по DOM не нужен.
+      state.voiceovers = page.translators || [];
+      renderVoiceovers();
+
+      const kind = page.pageType === 'SERIAL' ? 'Сериал' : 'Фильм';
+      setPageInfo(
+        `<span class="name">${escapeHtml(page.title)}</span>` +
+          `<span class="meta">${kind}${page.origTitle ? ` · ${escapeHtml(page.origTitle)}` : ''}` +
+          `${page.quality ? ` · плеер: ${escapeHtml(page.quality)}` : ''}</span>`,
+      );
+
+      setStatus('Получаем ссылки…');
+      const episode =
+        page.pageType === 'SERIAL'
+          ? { season: page.movie.season, episode: page.movie.episode }
+          : null;
+      const data = await resolveFor(episode);
+      const { qualities, subtitles, seasons } = await applyResolvedData(data);
+
+      state.resolved = { qualities, subtitles };
+      state.seasons = seasons;
+
+      renderQualities();
+      renderSubtitles();
+      renderSeasons();
+      showControls(true);
+      setStatus('');
+      checkAlreadyDownloaded();
+    } catch (error) {
+      state.lastError = String(error?.message || error);
+      setPageInfo(
+        `<span class="name">Ошибка</span><span class="meta">${escapeHtml(error.message)}</span>` +
+          `<span class="meta">Если это страница фильма или сериала — скопируйте диагностику (значок в шапке) и пришлите её.</span>`,
+        true,
+      );
+      showControls(false);
     }
-    renderVoiceovers();
-
-    const kind = page.pageType === 'SERIAL' ? 'Сериал' : 'Фильм';
-    setPageInfo(
-      `<span class="name">${escapeHtml(page.title)}</span>` +
-        `<span class="meta">${kind}${page.origTitle ? ` · ${escapeHtml(page.origTitle)}` : ''}` +
-        `${page.quality ? ` · плеер: ${escapeHtml(page.quality)}` : ''}</span>`,
-    );
-
-    setStatus('Получаем ссылки…');
-    const episode =
-      page.pageType === 'SERIAL'
-        ? { season: page.movie.season, episode: page.movie.episode }
-        : null;
-    const data = await resolveFor(episode);
-    const { qualities, subtitles, seasons } = await applyResolvedData(data);
-
-    state.resolved = { qualities, subtitles };
-    state.seasons = seasons;
-
-    renderQualities();
-    renderSubtitles();
-    renderSeasons();
-    showControls(true);
-    setStatus('');
-    checkAlreadyDownloaded();
-  } catch (error) {
-    state.lastError = String(error?.message || error);
-    setPageInfo(
-      `<span class="name">Ошибка</span><span class="meta">${escapeHtml(error.message)}</span>` +
-        `<span class="meta">Если это страница фильма или сериала — нажмите 🐞 и пришлите диагностику.</span>`,
-      true,
-    );
-    showControls(false);
+  } finally {
+    state.initBusy = false;
+    if (state.initQueued) {
+      state.initQueued = false;
+      init();
+    }
   }
 }
 
@@ -898,7 +1025,7 @@ function buildEpisodeList() {
 
   const mode = $('#range-mode').value;
   const seasons = state.seasons;
-  const keys = Object.keys(seasons).sort((a, b) => parseInt(a) - parseInt(b));
+  const keys = seasonKeys();
 
   if (mode === 'current') {
     return [{ season: page.movie.season, episode: page.movie.episode }];
@@ -917,42 +1044,37 @@ function buildEpisodeList() {
     return result;
   }
 
-  const sliced = sliceSeasons(
-    seasons,
-    $('#season-from').value,
-    $('#episode-from').value,
-    $('#season-to').value,
-    $('#episode-to').value || '',
-  );
-  const result = [];
-  for (const seasonKey of Object.keys(sliced)) {
-    for (const episode of sliced[seasonKey].episodes) {
-      result.push({ season: seasonKey, episode: episode.id });
-    }
-  }
-  return result;
+  // «Выбрать серии…» — то, что отмечено чипами (удобно для пропусков).
+  return selectedEpisodeList();
 }
 
-function buildTasksForEpisode(data, episode) {
+function buildTasksForEpisode(data, episode, subsOnly = false) {
   const page = state.page;
-  const qualities = decodeVideoURL(data.url);
-  const wanted = $('#quality').value;
-  const qualityLabel = pickQuality(qualities, wanted);
   const tasks = [];
   const warnings = [];
 
-  if (!qualityLabel) {
-    warnings.push(episode ? `серия ${episode.episode}: нет доступного качества` : 'нет доступного качества');
-    return { tasks, warnings };
-  }
+  // Качество нужно только для видео: в режиме «только субтитры» его не запрашиваем.
+  let qualityLabel = null;
+  let chosen = [];
 
-  const quality = qualities[qualityLabel];
-  const mp4 = quality.urls.filter(isMp4Url);
-  const hls = quality.urls.filter(isM3u8Url);
-  const chosen = mp4.length ? mp4 : hls;
-  if (!chosen.length) {
-    warnings.push(episode ? `серия ${episode.episode}: нет ссылок` : 'нет ссылок');
-    return { tasks, warnings };
+  if (!subsOnly) {
+    const qualities = decodeVideoURL(data.url);
+    const wanted = $('#quality').value;
+    qualityLabel = pickQuality(qualities, wanted);
+
+    if (!qualityLabel) {
+      warnings.push(episode ? `серия ${episode.episode}: нет доступного качества` : 'нет доступного качества');
+      return { tasks, warnings };
+    }
+
+    const quality = qualities[qualityLabel];
+    const mp4 = quality.urls.filter(isMp4Url);
+    const hls = quality.urls.filter(isM3u8Url);
+    chosen = mp4.length ? mp4 : hls;
+    if (!chosen.length) {
+      warnings.push(episode ? `серия ${episode.episode}: нет ссылок` : 'нет ссылок');
+      return { tasks, warnings };
+    }
   }
 
   // Названия сезона/серии берём из свежего ответа сайта (они зависят от озвучки),
@@ -969,25 +1091,27 @@ function buildTasksForEpisode(data, episode) {
     movie_id: page.movie.id,
     title: page.title,
     orig_title: page.origTitle,
-    quality: qualityLabel,
     voiceover: voiceover?.title ?? page.movie.translator_id,
     year: page.year ?? null,
     category: page.category ?? null,
     group_key: `movie-${page.movie.id}`,
   };
 
-  tasks.push({
-    ...base,
-    url: chosen[0],
-    alt_urls: chosen.slice(1),
-    season: episode?.season ?? null,
-    season_title: seasonData?.title ?? null,
-    episode: episode?.episode ?? null,
-    episode_title: episodeData?.title ?? null,
-    file_type: 'video',
-  });
+  if (!subsOnly) {
+    tasks.push({
+      ...base,
+      quality: qualityLabel,
+      url: chosen[0],
+      alt_urls: chosen.slice(1),
+      season: episode?.season ?? null,
+      season_title: seasonData?.title ?? null,
+      episode: episode?.episode ?? null,
+      episode_title: episodeData?.title ?? null,
+      file_type: 'video',
+    });
+  }
 
-  if ($('#subs-enabled').checked) {
+  if (subsOnly || $('#subs-enabled').checked) {
     const lang = $('#subs-lang').value;
     const subtitles = decodeSubtitles(data);
     const subtitle = subtitles.find((item) => item.lang === lang);
@@ -1020,15 +1144,19 @@ function buildTasksForEpisode(data, episode) {
   return { tasks, warnings };
 }
 
-async function handleDownload() {
+async function handleDownload(subsOnly = false) {
   if (state.busy) return;
   state.busy = true;
-  $('#download').disabled = true;
+
+  const downloadButton = $('#download');
+  const subsButton = $('#download-subs');
+  downloadButton.disabled = true;
+  subsButton.disabled = true;
 
   try {
     const episodes = buildEpisodeList();
     if (!episodes.length) {
-      setStatus('Не выбрано ни одной серии');
+      setStatus(subsOnly ? 'Не выбрано ни одной серии для субтитров' : 'Не выбрано ни одной серии');
       return;
     }
 
@@ -1039,7 +1167,7 @@ async function handleDownload() {
       const episode = episodes[i];
       setStatus(`Получаем ссылки: ${i + 1} из ${episodes.length}…`);
       const data = await resolveFor(episode);
-      const { tasks, warnings } = buildTasksForEpisode(data, episode);
+      const { tasks, warnings } = buildTasksForEpisode(data, episode, subsOnly);
       allTasks.push(...tasks);
       allWarnings.push(...warnings);
       if (i < episodes.length - 1) await new Promise((resolve) => setTimeout(resolve, 400));
@@ -1054,17 +1182,19 @@ async function handleDownload() {
     const result = await serverApi('/api/tasks', {
       method: 'POST',
       body: JSON.stringify({ tasks: allTasks }),
+      timeout: 20000, // длинные сериалы отправляются дольше обычного запроса
     });
 
     const warn = allWarnings.length ? ` Пропуски: ${allWarnings.join('; ')}` : '';
-    setStatus(`Отправлено: ${result.created}.${warn}`);
+    setStatus(subsOnly ? `Отправлено субтитров: ${result.created}.${warn}` : `Отправлено: ${result.created}.${warn}`);
     refreshQueue();
   } catch (error) {
     state.lastError = String(error?.message || error);
     setStatus(`Ошибка: ${error.message}`);
   } finally {
     state.busy = false;
-    $('#download').disabled = false;
+    downloadButton.disabled = false;
+    subsButton.disabled = false;
   }
 }
 
@@ -1094,7 +1224,7 @@ async function checkAlreadyDownloaded() {
     if (summary.error) parts.push(`${summary.error} с ошибкой`);
 
     box.textContent =
-      `⚠ Уже скачивалось: ${parts.join(', ')}. ` +
+      `Уже скачивалось: ${parts.join(', ')}. ` +
       (summary.filesOnDisk ? `Файлов на диске: ${summary.filesOnDisk}. ` : '') +
       'Повторная загрузка скачает заново и перезапишет готовые файлы, если они на месте.';
     box.classList.remove('hidden');
@@ -1104,13 +1234,39 @@ async function checkAlreadyDownloaded() {
 }
 
 async function refreshQueue() {
-  if (!state.settings.serverUrl) return;
+  if (!state.settings.serverUrl) {
+    updateConnSub(false);
+    return;
+  }
+  if (state.queueBusy) return; // не наслаиваем запросы друг на друга
+  state.queueBusy = true;
+
   try {
     const data = await serverApi('/api/state?limit=20');
-    renderQueue(data);
+    renderServerWidget(data);
+    updateConnSub(true);
+
+    // Перерисовываем список только когда данные изменились: иначе каждые 3 секунды
+    // DOM перерисовывался впустую (и сбивалось выделение текста при вводе).
+    const signature = JSON.stringify([
+      data.stats ?? null,
+      (data.tasks ?? []).map((task) => [task.id, task.status, task.receivedBytes]),
+    ]);
+    if (signature !== state.queueSignature) {
+      state.queueSignature = signature;
+      renderQueue(data);
+    }
   } catch (error) {
-    $('#queue-stats').textContent = 'нет связи';
-    $('#queue-list').innerHTML = `<div class="hint">${escapeHtml(error.message)}</div>`;
+    const message = escapeHtml(error.message);
+    if (state.queueSignature !== `err:${message}`) {
+      state.queueSignature = `err:${message}`;
+      $('#queue-stats').textContent = 'нет связи';
+      $('#queue-list').innerHTML = `<div class="hint">${message}</div>`;
+    }
+    renderServerWidget(null);
+    updateConnSub(false);
+  } finally {
+    state.queueBusy = false;
   }
 }
 
@@ -1180,12 +1336,53 @@ $('#subs-enabled').addEventListener('change', () => {
 });
 
 $('#range-mode').addEventListener('change', () => {
-  $('#range-custom').classList.toggle('hidden', $('#range-mode').value !== 'custom');
+  const custom = $('#range-mode').value === 'custom';
+  $('#range-custom').classList.toggle('hidden', !custom);
+  if (custom) renderEpisodeGrid(); // значения могли устареть после смены озвучки
 });
 
-$('#season-from').addEventListener('change', fillEpisodesFrom);
+/* ручной выбор серий: сезоны-табы, чипы, «выбрать все» / «снять» */
+$('#season-tabs').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-season]');
+  if (!button) return;
+  state.activeSeason = button.dataset.season;
+  renderEpisodeGrid();
+});
 
-$('#download').addEventListener('click', handleDownload);
+$('#ep-grid').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-episode]');
+  if (!button) return;
+  const key = epKey(state.activeSeason, button.dataset.episode);
+  if (state.selectedEpisodes.has(key)) state.selectedEpisodes.delete(key);
+  else state.selectedEpisodes.add(key);
+  renderEpisodeGrid();
+});
+
+$('#ep-all').addEventListener('click', () => {
+  for (const episode of state.seasons[state.activeSeason]?.episodes ?? []) {
+    state.selectedEpisodes.add(epKey(state.activeSeason, episode.id));
+  }
+  renderEpisodeGrid();
+});
+
+$('#ep-none').addEventListener('click', () => {
+  state.selectedEpisodes.clear();
+  renderEpisodeGrid();
+});
+
+$('#download').addEventListener('click', () => handleDownload(false));
+$('#download-subs').addEventListener('click', () => handleDownload(true));
+
+/* сворачиваемая очередь */
+$('#queue-toggle').addEventListener('click', async () => {
+  state.queueCollapsed = !state.queueCollapsed;
+  applyQueueCollapsed();
+  try {
+    await ext.storage.local.set({ [UI_KEY]: { queueCollapsed: state.queueCollapsed } });
+  } catch {
+    // настройка интерфейса не критична — если не сохранилась, просто живём дальше
+  }
+});
 
 $('#queue-list').addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
@@ -1236,9 +1433,29 @@ $('#stop-all').addEventListener('click', async (event) => {
 
 /* ───────────────────────────────── запуск ──────────────────────────────── */
 
+const POLL_MS = 3000;
+
+function startPolling() {
+  if (state.pollTimer) return;
+  state.pollTimer = setInterval(refreshQueue, POLL_MS);
+}
+
 init().finally(() => {
   refreshQueue();
-  state.pollTimer = setInterval(refreshQueue, 2000);
+  startPolling();
+});
+
+// Пока попап не виден, опрос сервера не нужен: возвращаемся — обновляем сразу.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (state.pollTimer) {
+      clearInterval(state.pollTimer);
+      state.pollTimer = null;
+    }
+  } else {
+    refreshQueue();
+    startPolling();
+  }
 });
 
 window.addEventListener('unload', () => {

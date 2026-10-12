@@ -42,12 +42,15 @@ function checkAuth(req, url) {
   return header === config.authToken || query === config.authToken;
 }
 
-function freeSpace(dir) {
+function diskSpace(dir) {
   try {
     const stat = fs.statfsSync(dir);
-    return Number(stat.bavail) * Number(stat.bsize);
+    return {
+      free: Number(stat.bavail) * Number(stat.bsize),
+      total: Number(stat.blocks) * Number(stat.bsize),
+    };
   } catch {
-    return null;
+    return { free: null, total: null };
   }
 }
 
@@ -58,13 +61,15 @@ async function handleApi(req, res, url) {
   if (pathname === '/api/state' && method === 'GET') {
     const limit = Math.min(Number(url.searchParams.get('limit')) || 300, 1000);
     const settings = db.getSettings();
+    const space = diskSpace(settings.download_dir);
     return send(res, 200, {
       server: {
         version: config.version,
         node: process.version,
         ffmpeg: downloader.ffmpegAvailable(),
         downloadDir: settings.download_dir,
-        freeSpace: freeSpace(settings.download_dir),
+        freeSpace: space.free,
+        totalSpace: space.total,
         active: downloader.activeCount(),
       },
       stats: db.getStats(),
@@ -98,6 +103,10 @@ async function handleApi(req, res, url) {
     return send(res, 200, { canceled: await downloader.cancelAll() });
   }
 
+  if (pathname === '/api/tasks/pause-all' && method === 'POST') {
+    return send(res, 200, { paused: downloader.pauseAll() });
+  }
+
   if (pathname === '/api/tasks/resume-all' && method === 'POST') {
     return send(res, 200, { resumed: downloader.resumeAll() });
   }
@@ -112,6 +121,14 @@ async function handleApi(req, res, url) {
 
   if (pathname === '/api/tasks/retry-failed' && method === 'POST') {
     return send(res, 200, { retried: db.retryFailedTasks() });
+  }
+
+  // «Очистить завершённые»: убрать из списка очереди, записи истории не удалять
+  if (pathname === '/api/tasks/hide-finished' && method === 'POST') {
+    const body = await readJson(req).catch(() => ({}));
+    const statuses = Array.isArray(body.statuses) ? body.statuses : ['done', 'canceled'];
+    const allowed = statuses.filter((status) => ['done', 'canceled'].includes(status));
+    return send(res, 200, { hidden: db.hideTasksByStatuses(allowed) });
   }
 
   const taskAction = /^\/api\/tasks\/(\d+)\/(cancel|pause|resume|retry)$/.exec(pathname);

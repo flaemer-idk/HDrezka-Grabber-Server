@@ -7,71 +7,123 @@
   </head>
   <body>
     <div class="app">
-      <header>
-        <div class="title">HDrezka <span class="arrow">→</span> Сервер</div>
-        <button id="copy-debug" class="icon-btn" title="Скопировать диагностику (если что-то не работает — пришлите её)">🐞</button>
-        <button id="toggle-settings" class="icon-btn" title="Настройки сервера">⚙</button>
-      </header>
-
-      <section id="settings" class="settings hidden">
-        <label class="field">
-          Адрес сервера
-          <input id="server-url" type="text" placeholder="http://192.168.1.100:8080" />
-        </label>
-        <label class="field">
-          Токен (если включён на сервере)
-          <input id="server-token" type="text" placeholder="необязательно" />
-        </label>
-        <div class="row">
-          <button id="save-settings" class="primary">Сохранить</button>
-          <span id="settings-status" class="hint"></span>
-        </div>
-      </section>
-
-      <div id="page-info" class="page-info">Определяем страницу…</div>
-      <div id="already" class="warn-line hidden"></div>
-
-      <section id="controls" class="controls hidden">
-        <label class="field">Озвучка <select id="voiceover"></select></label>
-        <label class="field">Качество <select id="quality"></select></label>
-
-        <label class="check"><input type="checkbox" id="subs-enabled" /> Скачивать субтитры</label>
-        <span id="subs-note" class="hint hidden"></span>
-        <label class="field hidden" id="subs-lang-wrap">
-          Язык субтитров <select id="subs-lang"></select>
-        </label>
-
-        <div id="range-block" class="hidden">
-          <label class="field">
-            Что качать
-            <select id="range-mode">
-              <option value="current">Текущую серию</option>
-              <option value="season">Все серии текущего сезона</option>
-              <option value="all">Весь сериал</option>
-              <option value="custom">Диапазон…</option>
-            </select>
-          </label>
-          <div id="range-custom" class="hidden range-grid">
-            <label class="field">Сезон с <select id="season-from"></select></label>
-            <label class="field">Серия с <select id="episode-from"></select></label>
-            <label class="field">Сезон по <select id="season-to"></select></label>
-            <label class="field">Серия по <select id="episode-to"></select></label>
+      <header class="pp-head">
+        <div class="pp-brand">
+          <svg class="ico pp-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <div class="pp-brand-text">
+            <div class="pp-brand-name">HDrezka <span class="pp-arrow">→</span> Сервер</div>
+            <div class="pp-brand-sub" id="conn-sub">сервер на связи</div>
           </div>
         </div>
+        <div class="pp-head-actions">
+          <button id="copy-debug" class="icon-btn" title="Скопировать диагностику (если что-то не работает — пришлите её)">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><rect x="9" y="9" width="12" height="12"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <button id="toggle-settings" class="icon-btn" title="Настройки сервера">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10 3.09V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+        </div>
+      </header>
 
-        <button id="download" class="primary big">Скачать на сервер</button>
-        <div id="action-status" class="hint"></div>
+      <section id="settings" class="card hidden">
+        <div class="card-head">
+          <div class="card-title">Сервер загрузок</div>
+        </div>
+        <div class="card-body">
+          <label class="field">
+            <span class="field-label">Адрес сервера</span>
+            <input id="server-url" class="input mono" type="text" placeholder="http://192.168.1.100:8080" spellcheck="false" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span class="field-label">Токен <span class="opt">(если включён на сервере)</span></span>
+            <input id="server-token" class="input mono" type="text" placeholder="необязательно" spellcheck="false" autocomplete="off" />
+          </label>
+        </div>
+        <div class="card-foot">
+          <button id="save-settings" class="btn btn-primary" type="button">Сохранить</button>
+          <span id="settings-status" class="foot-note"></span>
+        </div>
       </section>
 
-      <section id="queue" class="queue hidden">
-        <div class="queue-head">
-          <span>На сервере</span>
-          <span id="queue-stats" class="muted"></span>
-          <button id="stop-all" type="button" class="mini" title="Отменить все активные загрузки">Остановить</button>
-          <button id="resume-all" type="button" class="mini" title="Возобновить всё, что на паузе">Возобновить</button>
+      <section id="page-card" class="card">
+        <div id="page-info" class="card-body page-info">Определяем страницу…</div>
+      </section>
+
+      <div id="already" class="warn-line hidden"></div>
+
+      <section id="controls" class="card hidden">
+        <div class="card-body">
+          <div class="two-col">
+            <label class="field">Озвучка<select id="voiceover" class="input"></select></label>
+            <label class="field">Качество<select id="quality" class="input"></select></label>
+          </div>
+
+          <div class="subs-row">
+            <label class="field-check"><input type="checkbox" id="subs-enabled" /> Скачивать субтитры</label>
+            <button id="download-subs" class="btn btn-sm" type="button" title="Отправить на сервер только субтитры выбранных серий — удобно, если видео уже скачано">Только субтитры</button>
+          </div>
+          <div id="subs-note" class="hint hidden"></div>
+          <label class="field hidden" id="subs-lang-wrap">
+            <span class="field-label">Язык субтитров</span>
+            <select id="subs-lang" class="input"></select>
+          </label>
+
+          <div id="range-block">
+            <label class="field">
+              <span class="field-label">Что качать</span>
+              <select id="range-mode" class="input">
+                <option value="current">Текущую серию</option>
+                <option value="season">Все серии текущего сезона</option>
+                <option value="all">Весь сериал</option>
+                <option value="custom">Выбрать серии…</option>
+              </select>
+            </label>
+
+            <div id="range-custom" class="hidden">
+              <div class="season-tabs" id="season-tabs"></div>
+              <div class="ep-grid" id="ep-grid"></div>
+              <div class="grid-tools">
+                <button id="ep-all" class="btn btn-sm" type="button">Выбрать все</button>
+                <button id="ep-none" class="btn btn-sm" type="button">Снять</button>
+                <span class="grid-spacer"></span>
+                <span class="grid-summary" id="ep-summary"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-foot stack">
+          <button id="download" class="btn btn-primary btn-block" type="button">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Скачать на сервер</span>
+          </button>
+          <div id="action-status" class="status-line"></div>
+        </div>
+      </section>
+
+      <section id="queue" class="card hidden">
+        <div class="card-head queue-head">
+          <div class="queue-head-row">
+            <button id="queue-toggle" class="queue-toggle" type="button" aria-expanded="true" title="Свернуть или развернуть очередь">
+              <svg class="ico q-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+              <span class="card-title">На сервере</span>
+            </button>
+            <div class="head-actions">
+              <button id="resume-all" type="button" class="btn btn-sm" title="Возобновить всё, что на паузе">Возобновить</button>
+              <button id="stop-all" type="button" class="btn btn-sm" title="Отменить все активные загрузки">Остановить</button>
+            </div>
+          </div>
+          <div id="queue-stats" class="card-sub queue-stats">—</div>
         </div>
         <div id="queue-list" class="queue-list"></div>
       </section>
+
+      <div class="server-widget" id="server-widget">
+        <span class="sw-dot" id="sw-dot"></span>
+        <span class="sw-free" id="sw-free">—</span>
+        <span class="sw-path" id="sw-folder">—</span>
+        <span class="sw-spacer"></span>
+        <span class="sw-meta" id="sw-meta"></span>
+      </div>
     </div>
 
     <script src="popup.js"></script>

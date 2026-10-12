@@ -108,7 +108,8 @@ function initDb(db) {
       file_path       TEXT,
       created_at      INTEGER NOT NULL,
       started_at      INTEGER,
-      finished_at     INTEGER
+      finished_at     INTEGER,
+      queue_hidden    INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_tasks_queue ON tasks(status, next_attempt_at, id);
 
@@ -123,6 +124,7 @@ function initDb(db) {
   for (const [name, type] of [
     ['year', 'TEXT'],
     ['subtitle_lang_code', 'TEXT'],
+    ['queue_hidden', 'INTEGER NOT NULL DEFAULT 0'],
   ]) {
     if (!columns.includes(name)) db.exec(`ALTER TABLE tasks ADD COLUMN ${name} ${type}`);
   }
@@ -185,6 +187,7 @@ const TASK_COLUMNS = [
   'created_at',
   'started_at',
   'finished_at',
+  'queue_hidden',
 ];
 
 function normalizeValue(value) {
@@ -304,9 +307,20 @@ export function deleteTasksByStatuses(statuses) {
   return Number(info.changes);
 }
 
+/** «Очистить завершённые»: убирает задачи из списка очереди, не удаляя записи (они остаются в истории). */
+export function hideTasksByStatuses(statuses) {
+  if (!statuses.length) return 0;
+  const placeholders = statuses.map(() => '?').join(', ');
+  const info = q(
+    `UPDATE tasks SET queue_hidden = 1 WHERE status IN (${placeholders}) AND queue_hidden = 0`,
+  ).run(...statuses);
+  return Number(info.changes);
+}
+
 export function retryFailedTasks() {
   const info = q(
-    `UPDATE tasks SET status = 'queued', attempts = 0, next_attempt_at = 0, error = NULL
+    `UPDATE tasks SET status = 'queued', attempts = 0, next_attempt_at = 0, error = NULL,
+     queue_hidden = 0
      WHERE status = 'error'`,
   ).run();
   return Number(info.changes);
@@ -392,5 +406,6 @@ export function serializeTask(row) {
     createdAt: row.created_at,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
+    queueHidden: row.queue_hidden === 1,
   };
 }

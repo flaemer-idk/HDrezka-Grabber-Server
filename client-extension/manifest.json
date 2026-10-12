@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HDrezka Grabber → Сервер",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Отправляет ссылку на видео со страницы hdrezka на ваш сервер загрузок: файл качается сразу на сервер.",
   "minimum_chrome_version": "111",
   "browser_specific_settings": {

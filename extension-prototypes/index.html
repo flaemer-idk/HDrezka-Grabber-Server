@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Прототипы расширения под дизайн сайта</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --border: #e2e5ea;
+    --border-strong: #d3d8df;
+    --text: #101828;
+    --text-2: #344054;
+    --muted: #667085;
+    --muted-2: #98a2b3;
+    --accent: #2563eb;
+    --accent-tint: #eff4ff;
+    --ok: #16a34a;
+    --ok-tint: #e9f8ef;
+    --info-tint: #eef2f6;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .05);
+    --shadow-md: 0 4px 12px rgba(16, 24, 40, .08);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; border-radius: 0 !important; }
+  body {
+    margin: 0;
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+    background: var(--bg);
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 36px 20px 64px; }
+  h1 { margin: 0 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+  .lead { margin: 0 0 4px; color: var(--text-2); max-width: 760px; }
+  .lead-muted { color: var(--muted); font-size: 13px; max-width: 760px; }
+  .rule { height: 1px; background: var(--border); margin: 22px 0 26px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .pcard {
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+  }
+  .pcard-head {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    background: #fbfbfc;
+  }
+  .pnum {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    color: var(--muted-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .pname { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+  .pbody { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; }
+  .lvl {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    height: 22px;
+    padding: 0 8px;
+    font-size: 11.5px;
+    font-weight: 650;
+    background: var(--accent-tint);
+    color: var(--accent);
+  }
+  .lvl::before { content: ""; width: 6px; height: 6px; background: currentColor; flex: 0 0 6px; }
+  .lvl.lvl-2 { background: var(--info-tint); color: #475467; }
+  .lvl.lvl-3 { background: #fdf3e3; color: #d97706; }
+  .pdesc { color: var(--text-2); font-size: 13px; }
+  .plist { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .plist li { position: relative; padding-left: 15px; font-size: 12.5px; color: var(--muted); }
+  .plist li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 7px;
+    width: 5px;
+    height: 5px;
+    background: var(--border-strong);
+  }
+  .pfoot {
+    margin-top: auto;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    background: #fbfbfc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .golink {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 12px;
+    background: var(--accent);
+    color: #fff;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .golink:hover { background: #1d4fd7; }
+  .open-hint { font-size: 11.5px; color: var(--muted-2); }
+  .note {
+    margin-top: 26px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+    color: var(--text-2);
+    font-size: 13px;
+  }
+  .note b { font-weight: 650; }
+  code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--info-tint);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Прототипы расширения — дизайн сайта, три разные логики</h1>
+  <p class="lead">
+    Попап расширения «HDrezka → Сервер» в палитре и компонентах нового веб-интерфейса
+    сервера (светлая панель, синий акцент, ноль скруглений). Данные во всех трёх —
+    ненастоящие, «скачивание» живёт симуляцией.
+  </p>
+  <p class="lead-muted">
+    Варианты отличаются не оформлением, а логикой: от «просто перекрасили» до
+    «сделали вообще по-другому». Смотрите все три, потом выбирайте.
+  </p>
+
+  <div class="rule"></div>
+
+  <div class="grid">
+    <div class="pcard">
+      <div class="pcard-head">
+        <span class="pnum">01</span>
+        <span class="pname">Рескин</span>
+      </div>
+      <div class="pbody">
+        <span class="lvl">Тот же попап, новый вид</span>
+        <p class="pdesc">
+          Логика и состав — как в текущем расширении: определить страницу, выбрать
+          озвучку/качество/субтитры/диапазон, одна кнопка, очередь внизу. Перестроено
+          только оформление.
+        </p>
+        <ul class="plist">
+          <li>Всё на одном экране, как сейчас</li>
+          <li>Нативные селекты, диапазон — четыре поля</li>
+          <li>Переносится в client-extension почти без работы</li>
+        </ul>
+      </div>
+      <div class="pfoot">
+        <span class="open-hint">01-reskin/index.html</span>
+        <a class="golink" href="01-reskin/index.html">Открыть →</a>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <div class="pcard-head">
+        <span class="pnum">02</span>
+        <span class="pname">Мастер</span>
+      </div>
+      <div class="pbody">
+        <span class="lvl lvl-2">Другая компоновка и сценарий</span>
+        <p class="pdesc">
+          Загрузка и очередь — два отдельных экрана. Отправка идёт мастером из трёх
+          шагов: что качать (чипы серий) → параметры (радио-карточки) → проверка и
+          отправка.
+        </p>
+        <ul class="plist">
+          <li>Сетка серий чипами вместо селектов</li>
+          <li>Экран очереди с фильтрами и группами</li>
+          <li>Сводка «выбрано N серий · ≈ X GB»</li>
+        </ul>
+      </div>
+      <div class="pfoot">
+        <span class="open-hint">02-wizard/index.html</span>
+        <a class="golink" href="02-wizard/index.html">Открыть →</a>
+      </div>
+    </div>
+
+    <div class="pcard">
+      <div class="pcard-head">
+        <span class="pnum">03</span>
+        <span class="pname">Автопилот</span>
+      </div>
+      <div class="pbody">
+        <span class="lvl lvl-3">Другая парадигма</span>
+        <p class="pdesc">
+          Попапа нет: панель закреплена поверх страницы, знает её контекст и качает
+          умолчаниями в один клик. Умеет ставить сезон целиком и следить за новыми
+          сериями.
+        </p>
+        <ul class="plist">
+          <li>Одна кнопка «Скачать серию» вместо формы</li>
+          <li>Автопилот: новые серии ставятся сами</li>
+          <li>Сворачивается в пилюлю в углу</li>
+        </ul>
+      </div>
+      <div class="pfoot">
+        <span class="open-hint">03-autopilot/index.html</span>
+        <a class="golink" href="03-autopilot/index.html">Открыть →</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>Как смотреть.</b> Открывать можно прямо с диска (двойной клик) — всё работает без
+    сервера. Если удобнее сразу всё: <code>cd extension-prototypes &amp;&amp; python3 -m http.server 9100</code>.
+    Спецификация прототипов и описание отличий — в <code>SPEC.md</code>.
+  </div>
+</div>
+</body>
+</html>
